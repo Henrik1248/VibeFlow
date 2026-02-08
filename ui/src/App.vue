@@ -22,6 +22,11 @@ onMounted(async () => {
         } catch (e) {
             console.error("Onboarding check failed:", e);
         }
+    } else if (windowLabel.value === 'overlay') {
+        console.log("Applying transparency classes for overlay");
+        document.documentElement.classList.add('transparent');
+        document.body.classList.add('transparent');
+        document.getElementById('app').classList.add('transparent');
     }
     loading.value = false;
 });
@@ -32,7 +37,7 @@ const handleOnboardingComplete = () => {
 </script>
 
 <template>
-  <div v-if="!loading" class="app-root">
+  <div v-if="!loading" class="app-root" :class="windowLabel">
     <!-- Overlay Window -->
     <Overlay v-if="windowLabel === 'overlay'" />
     

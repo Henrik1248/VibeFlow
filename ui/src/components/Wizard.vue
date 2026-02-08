@@ -22,8 +22,8 @@ const tiers = [
 ];
 
 // Hotkey State
-const modifiers = ref([]);
-const code = ref('F9');
+const modifiers = ref(['CTRL', 'SHIFT']);
+const code = ref('SPACE');
 const isRecordingHotkey = ref(false);
 
 const nextStep = async () => {
@@ -224,46 +224,164 @@ const startDownload = async () => {
 </template>
 
 <style scoped>
+/* Tier Cards - Minimalist */
 .grid-tiers {
     display: grid;
     grid-template-columns: 1fr 1fr;
+    gap: 12px;
     width: 100%;
 }
 
 .tier-card {
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid var(--border-light);
-    border-radius: 1.25rem;
-    padding: 1.25rem;
+    border-radius: 1rem;
+    padding: 1rem;
     cursor: pointer;
     transition: var(--transition-smooth);
     text-align: left;
 }
 
-.tier-card:hover { border-color: rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); }
-.tier-card.active { border-color: var(--brand-primary); background: rgba(59, 130, 246, 0.1); }
+.tier-card:hover { 
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.2);
+}
 
-.tier-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem; }
-.tier-size { font-size: 9px; font-weight: 900; background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 4px; color: var(--text-secondary); }
-.tier-name { font-weight: 800; font-family: 'Outfit', sans-serif; font-size: 1.1rem; margin-bottom: 0.25rem; font-style: italic; }
-.tier-desc { font-size: 0.7rem; color: var(--text-secondary); }
+.tier-card.active { 
+    border-color: var(--brand-primary); 
+    background: rgba(0, 132, 255, 0.1);
+}
 
-.download-box { width: 100%; background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 1rem; border: 1px solid var(--border-light); }
-.progress-bar { height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; }
-.progress-bar .fill { height: 100%; background: var(--brand-primary); transition: width 0.3s ease; box-shadow: 0 0 10px var(--brand-glow); }
+.tier-header { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    margin-bottom: 0.5rem; 
+}
 
-.visualizer-shell { height: 120px; width: 100%; background: rgba(0,0,0,0.3); border-radius: 1.5rem; border: 1px solid var(--border-light); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.tier-size { 
+    font-size: 10px; 
+    font-weight: 600; 
+    color: var(--text-secondary);
+}
 
-.hotkey-display { width: 100%; padding: 2.5rem; background: rgba(255,255,255,0.02); border: 2px dashed rgba(255,255,255,0.1); border-radius: 2rem; display: flex; flex-direction: column; align-items: center; gap: 1.5rem; cursor: pointer; transition: var(--transition-smooth); }
-.hotkey-display.recording { border-color: var(--brand-primary); background: rgba(59, 130, 246, 0.05); transform: scale(1.02); }
-.key-cap { background: #1a1b26; border: 1px solid rgba(255,255,255,0.1); padding: 0.5rem 1rem; border-radius: 0.75rem; font-family: 'JetBrains Mono', monospace; font-weight: 700; box-shadow: 0 4px 0 rgba(0,0,0,0.4); }
-.key-cap.main { font-size: 2.5rem; color: var(--brand-accent); font-style: italic; }
-.status-pulse { font-size: 10px; font-weight: 900; color: var(--brand-primary); letter-spacing: 0.3em; animation: flash 1s infinite alternate; }
-.status-hint { font-size: 10px; font-weight: 700; color: var(--text-secondary); letter-spacing: 0.2em; }
+.tier-name { 
+    font-weight: 700; 
+    font-size: 1rem; 
+    color: var(--text);
+}
 
-.step-dots { display: flex; gap: 0.75rem; margin-top: 2rem; }
-.dot { height: 4px; border-radius: 2px; background: rgba(255,255,255,0.1); transition: var(--transition-smooth); width: 16px; }
-.dot.active { background: var(--brand-primary); width: 48px; box-shadow: 0 0 10px var(--brand-glow); }
+.tier-desc { 
+    font-size: 0.75rem; 
+    color: var(--text-secondary); 
+}
 
-@keyframes flash { from { opacity: 0.3; } to { opacity: 1; } }
+/* Download Progress */
+.download-box { 
+    width: 100%; 
+    background: rgba(255, 255, 255, 0.05); 
+    padding: 1rem; 
+    border-radius: 12px; 
+}
+
+.progress-bar { 
+    height: 6px; 
+    background: rgba(255, 255, 255, 0.1); 
+    border-radius: 3px; 
+    overflow: hidden; 
+}
+
+.progress-bar .fill { 
+    height: 100%; 
+    background: var(--brand-primary);
+    transition: width 0.3s ease; 
+}
+
+/* Visualizer Shell */
+.visualizer-shell { 
+    height: 100px; 
+    width: 100%; 
+    background: rgba(0, 0, 0, 0.2); 
+    border-radius: 16px; 
+    border: 1px solid var(--border-light); 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+}
+
+/* Hotkey Display */
+.hotkey-display { 
+    width: 100%; 
+    padding: 2rem; 
+    background: rgba(255, 255, 255, 0.02); 
+    border: 1px solid var(--border); 
+    border-radius: 20px; 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    gap: 1rem; 
+    cursor: pointer; 
+    transition: var(--transition-smooth); 
+}
+
+.hotkey-display.recording { 
+    border-color: var(--brand-primary); 
+    background: rgba(0, 132, 255, 0.05); 
+}
+
+.key-cap { 
+    background: var(--bg-tertiary); 
+    border: 1px solid var(--border); 
+    padding: 0.5rem 1rem; 
+    border-radius: 8px; 
+    font-family: 'JetBrains Mono', monospace; 
+    font-weight: 600; 
+}
+
+.key-cap.main { 
+    font-size: 2rem; 
+    color: var(--brand-primary); 
+}
+
+.status-pulse { 
+    font-size: 11px; 
+    font-weight: 600; 
+    color: var(--brand-primary); 
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.status-hint { 
+    font-size: 11px; 
+    color: var(--text-secondary); 
+}
+
+/* Step Dots */
+.step-dots { 
+    display: flex; 
+    gap: 8px; 
+    margin-top: 2rem; 
+}
+
+.dot { 
+    height: 4px; 
+    border-radius: 2px; 
+    background: rgba(255, 255, 255, 0.1); 
+    transition: var(--transition-smooth); 
+    width: 12px; 
+}
+
+.dot.active { 
+    background: var(--text);
+    width: 32px; 
+}
+
+.glass-panel {
+    animation: fadeIn 0.4s ease-out forwards;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
 </style>

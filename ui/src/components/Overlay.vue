@@ -1,95 +1,129 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, reactive, onMounted, onUnmounted } from 'vue';
 import { listen } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
 
 const amplitude = ref(0);
-const status = ref('Recording');
+// 3 stripes - Using reactive array for better performance in animation loop
+const dots = reactive([
+    { height: 8, opacity: 0.8 },
+    { height: 8, opacity: 0.8 },
+    { height: 8, opacity: 0.8 }
+]);
+
 let unlistenAmp;
-let unlistenStatus;
+let animationFrame;
+let lastTime = 0;
 
 onMounted(async () => {
+    invoke('ui_ready').catch(e => console.error("Failed to invoke ui_ready:", e));
+
     unlistenAmp = await listen('amplitude', (event) => {
-        amplitude.value = Math.min(event.payload * 2.5, 1.0);
+        // Boost amplitude for more dramatic effect
+        const val = event.payload;
+        if (Math.random() < 0.05) console.log("Amp received:", val); // Log 5% of packets to avoid spam
+        // UNCAPPED: Let it go wild. Sensitivity 60x.
+        amplitude.value = val * 60.0;
     });
-    unlistenStatus = await listen('status', (event) => {
-        status.value = event.payload;
-    });
+
+    const animate = (time) => {
+        const delta = time - lastTime;
+        lastTime = time;
+
+        // Directly mutate reactive objects
+        dots.forEach((dot, i) => {
+            const isActive = amplitude.value > 0.001;
+            
+            // Idle: tiny dots (6px) breathing slightly
+            const idleHeight = 6 + Math.sin(time * 0.003 + i) * 2;
+            
+            // Active: High energy vertical expansion (up to 300px limit naturally by window)
+            const waveFactor = 0.5 + 0.5 * Math.sin(time * 0.01 + i * 2.0);
+            const activeHeight = 6 + (amplitude.value * 250) * waveFactor;
+            
+            const targetHeight = isActive ? activeHeight : idleHeight;
+            
+            // Spring-like damping
+            dot.height = dot.height + (targetHeight - dot.height) * 0.25;
+            dot.opacity = 0.9;
+        });
+
+        animationFrame = requestAnimationFrame(animate);
+    };
+    
+    animationFrame = requestAnimationFrame(animate);
 });
 
 onUnmounted(() => {
     if (unlistenAmp) unlistenAmp();
-    if (unlistenStatus) unlistenStatus();
+    if (animationFrame) cancelAnimationFrame(animationFrame);
 });
 </script>
 
 <template>
-  <div class="overlay-container">
-    <div class="status-indicator" :class="{ recording: status === 'Recording' }"></div>
-    <div class="wave-container">
-      <div class="wave-bar" v-for="i in 12" :key="i" 
-           :style="{ 
-             height: (10 + amplitude * 40 * Math.sin(i * 0.5 + Date.now() * 0.005)) + 'px',
-             animationDelay: (i * 0.05) + 's'
-           }">
+  <div class="overlay-wrapper">
+      <div class="glass-capsule">
+        <div class="stripes">
+          <div v-for="(dot, i) in dots" :key="i" 
+               class="stripe"
+               :style="{ 
+                 height: `${dot.height}px`
+               }">
+          </div>
+        </div>
       </div>
-    </div>
-    <span class="status-label">{{ status }}</span>
   </div>
 </template>
 
+<style>
+/* Global enforcement for this component's view */
+html, body, #app {
+    background: transparent !important;
+    overflow: hidden;
+}
+</style>
+
 <style scoped>
-.overlay-container {
+.overlay-wrapper {
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(10px);
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 0 16px;
-  box-sizing: border-box;
+  align-items: center; 
+  justify-content: center;
+  background: transparent !important;
+  pointer-events: none;
 }
 
-.status-indicator {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #30d158;
-  flex-shrink: 0;
+.glass-capsule {
+    /* White Transparent Glass */
+    background: rgba(255, 255, 255, 0.15); /* Slightly visible white tint */
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    
+    border-radius: 99px; /* Fully rounded pill */
+    padding: 10px 18px; /* Tighter padding */
+    
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
 }
 
-.status-indicator.recording {
-  background: #ff453a;
-  animation: pulse 1s infinite;
-}
-
-.wave-container {
-  flex: 1;
+.stripes {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  height: 50px;
+  gap: 6px;
+  background: transparent;
 }
 
-.wave-bar {
-  width: 4px;
-  background: #0a84ff;
-  border-radius: 2px;
-  transition: height 0.1s ease;
-}
-
-.status-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.8);
-  flex-shrink: 0;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+.stripe {
+  width: 6px;
+  background: #ffffff; /* White dots for contrast on glass */
+  border-radius: 99px;
+  will-change: height;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
 }
 </style>

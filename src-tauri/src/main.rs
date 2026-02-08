@@ -2,24 +2,35 @@
 
 mod modules {
     pub mod audio;
+    pub mod commands;
     pub mod inference;
     pub mod llm;
     pub mod os_integration;
-    pub mod commands;
     pub mod state;
 }
 
-use tauri::{Manager, Emitter, AppHandle};
-use tauri::tray::{TrayIconBuilder, MouseButton, MouseButtonState, TrayIconEvent};
-use tauri::menu::{Menu, MenuItem};
-use tauri_plugin_autostart::MacosLauncher;
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState, Code, Modifiers, ShortcutEvent, Shortcut};
-use std::sync::Arc;
-use tokio::sync::mpsc;
+use modules::{
+    audio::AudioEngine, inference::InferenceEngine, llm::ContextEngine,
+    os_integration::OSIntegration, state::AppState,
+};
 use parking_lot::Mutex;
 use rodio::{OutputStream, Sink, Source};
-use modules::{audio::AudioEngine, inference::InferenceEngine, llm::ContextEngine, os_integration::OSIntegration, state::AppState};
+use std::sync::Arc;
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::window::Color;
+use tauri::{AppHandle, Emitter, Manager};
+use tauri_plugin_autostart::MacosLauncher;
+use tauri_plugin_global_shortcut::{
+    Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutEvent, ShortcutState,
+};
+use tokio::sync::mpsc;
 // use modules::audio::SensitiveAudio; (unused)
+
+#[tauri::command]
+fn ui_ready() {
+    println!("[DEBUG] >>> OVERLAY UI IS READY AND CONNECTED! <<<");
+}
 
 #[tokio::main]
 async fn main() {
@@ -27,14 +38,66 @@ async fn main() {
     let tx_audio = Arc::new(Mutex::new(None));
     let amplitude = Arc::new(Mutex::new(0.0));
     let selected_device = Arc::new(Mutex::new(None));
-    let hotkey_modifiers = Arc::new(Mutex::new(Modifiers::empty()));
-    let hotkey_code = Arc::new(Mutex::new(Code::F9));
+    let hotkey_modifiers = Arc::new(Mutex::new(Modifiers::CONTROL | Modifiers::SHIFT));
+    let hotkey_code = Arc::new(Mutex::new(Code::Space));
     let selected_model = Arc::new(Mutex::new("ggml-base.en.bin".to_string()));
+
+    // Create a temporary app handle to get the app_data_dir without starting the app
+    // Actually, we can just use std::fs since we know where it should be on Windows
+    let app_data = std::env::var("APPDATA")
+        .ok()
+        .map(|ad| std::path::PathBuf::from(ad).join("com.vibeflow.app"))
+        .unwrap_or_default();
+
+    let config_path = app_data.join("config.json");
+    if config_path.exists() {
+        if let Ok(data) = std::fs::read_to_string(&config_path) {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&data) {
+                if let Some(m) = json.get("model").and_then(|v| v.as_str()) {
+                    *selected_model.lock() = m.to_string();
+                }
+                if let Some(d) = json.get("device").and_then(|v| v.as_str()) {
+                    *selected_device.lock() = Some(d.to_string());
+                }
+                // Handle hotkey loading if present in config
+                if let Some(hk) = json.get("hotkey") {
+                    if let Some(mods_arr) = hk.get("modifiers").and_then(|v| v.as_array()) {
+                        let mut m = Modifiers::empty();
+                        for mod_v in mods_arr {
+                            if let Some(mod_str) = mod_v.as_str() {
+                                match mod_str.to_uppercase().as_str() {
+                                    "CTRL" | "CONTROL" => m |= Modifiers::CONTROL,
+                                    "SHIFT" => m |= Modifiers::SHIFT,
+                                    "ALT" => m |= Modifiers::ALT,
+                                    "SUPER" | "COMMAND" | "META" => m |= Modifiers::SUPER,
+                                    _ => {}
+                                }
+                            }
+                        }
+                        *hotkey_modifiers.lock() = m;
+                    }
+                    if let Some(code_str) = hk.get("code").and_then(|v| v.as_str()) {
+                        // Simple mapping for Space
+                        if code_str.to_uppercase() == "SPACE" {
+                            *hotkey_code.lock() = Code::Space;
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec![])))
-        .plugin(tauri_plugin_global_shortcut::Builder::new().with_handler(handle_shortcut).build())
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            Some(vec![]),
+        ))
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(handle_shortcut)
+                .build(),
+        )
         .invoke_handler(tauri::generate_handler![
             modules::commands::get_audio_devices,
             modules::commands::set_audio_device,
@@ -44,14 +107,17 @@ async fn main() {
             modules::commands::download_model,
             modules::commands::get_selected_model,
             modules::commands::get_onboarding_status,
-            modules::commands::complete_onboarding
+            modules::commands::get_onboarding_status,
+            modules::commands::complete_onboarding,
+            ui_ready
         ])
         .setup(|app| {
             let app_data = app.path().app_data_dir()?;
             let inference_engine = Arc::new(InferenceEngine::new(app_data));
 
             // DerJannik Branding
-            println!(r#"
+            println!(
+                r#"
     __      ___ _          ______ _               
     \ \    / (_) |        |  ____| |              
      \ \  / / _| |__   ___| |__  | | _____      __
@@ -59,10 +125,11 @@ async fn main() {
        \  /  | | |_) |  __/ |    | | (_) \ V  V / 
         \/   |_|_.__/ \___|_|    |_|\___/ \_/\_/  
                                     by DerJannik
-            "#);
+            "#
+            );
             println!("[INFO] Made by DerJannik | https://de.fiverr.com/s/xXgY29x");
             println!("[INFO] VibeFlow Professional initialized.");
-            
+
             let mods_val = *hotkey_modifiers.lock();
             let code_val = *hotkey_code.lock();
 
@@ -83,7 +150,7 @@ async fn main() {
             let _ = app.global_shortcut().register(shortcut);
 
             // System Tray Setup
-            let app_handle = app.handle().clone();
+            let _app_handle = app.handle().clone();
             let show_item = MenuItem::with_id(app, "show", "Show VibeFlow", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
@@ -91,23 +158,26 @@ async fn main() {
             let _tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
                 .menu(&menu)
-                .menu_on_left_click(false)
-                .on_menu_event(move |app, event| {
-                    match event.id.as_ref() {
-                        "show" => {
-                            if let Some(window) = app.get_webview_window("main") {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                            }
-                        },
-                        "quit" => {
-                            app.exit(0);
-                        },
-                        _ => {}
+                .show_menu_on_left_click(false)
+                .on_menu_event(move |app, event| match event.id.as_ref() {
+                    "show" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
                     }
+                    "quit" => {
+                        app.exit(0);
+                    }
+                    _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {
-                    if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
                         if let Some(window) = tray.app_handle().get_webview_window("main") {
                             let _ = window.show();
                             let _ = window.set_focus();
@@ -142,7 +212,7 @@ fn handle_shortcut(app: &AppHandle, shortcut: &Shortcut, event: ShortcutEvent) {
     if shortcut.matches(mods, code) && event.state() == ShortcutState::Pressed {
         let recording = { *state.is_recording.lock() };
         println!("[DEBUG] Shortcut triggered: Recording={}", recording);
-        
+
         if recording {
             stop_recording(app);
         } else {
@@ -155,10 +225,10 @@ pub fn re_register_shortcut(app: &AppHandle) -> Result<(), tauri_plugin_global_s
     let state = app.state::<AppState>();
     let mods = *state.hotkey_modifiers.lock();
     let code = *state.hotkey_code.lock();
-    
+
     // Unregister all first to be safe
     let _ = app.global_shortcut().unregister_all();
-    
+
     let shortcut = Shortcut::new(Some(mods), code);
     app.global_shortcut().register(shortcut)?;
     println!("[DEBUG] Hotkey re-registered: {:?} + {:?}", mods, code);
@@ -183,18 +253,86 @@ fn play_feedback_sound(frequency: f32) {
 fn start_recording(app: &AppHandle) {
     let state = app.state::<AppState>();
     let mut recording_guard = state.is_recording.lock();
-    if *recording_guard { return; } 
+    if *recording_guard {
+        return;
+    }
     *recording_guard = true;
 
     play_feedback_sound(880.0);
     println!(">>> VibeFlow: Recording Toggle ON");
 
-    // Show overlay
+    // Get active window to determine which monitor the user is looking at
+    let target_monitor = if let Ok(active_window) = active_win_pos_rs::get_active_window() {
+        let active_center_x =
+            active_window.position.x + (active_window.position.width / 2.0) as f64;
+        let active_center_y =
+            active_window.position.y + (active_window.position.height / 2.0) as f64;
+
+        // Find monitor containing this point
+        app.available_monitors().ok().and_then(|monitors| {
+            monitors.into_iter().find(|m| {
+                let pos = m.position();
+                let size = m.size();
+                let m_x = pos.x as f64;
+                let m_y = pos.y as f64;
+                let m_w = size.width as f64;
+                let m_h = size.height as f64;
+
+                active_center_x >= m_x
+                    && active_center_x < (m_x + m_w)
+                    && active_center_y >= m_y
+                    && active_center_y < (m_y + m_h)
+            })
+        })
+    } else {
+        None
+    };
+
+    // Fallback to main window or overlay's current
+    let final_monitor = target_monitor
+        .or_else(|| {
+            let main_window = app.get_webview_window("main");
+            main_window.and_then(|w| w.current_monitor().ok().flatten())
+        })
+        .or_else(|| {
+            app.get_webview_window("overlay")
+                .and_then(|w| w.current_monitor().ok().flatten())
+        });
+
     if let Some(overlay) = app.get_webview_window("overlay") {
+        if let Some(monitor) = final_monitor {
+            println!(
+                "[DEBUG] Positioning overlay on monitor: {:?}",
+                monitor.name()
+            );
+            let size = monitor.size();
+            // Increase height to 300px to allow for tall vertical stripes without clipping
+            let win_size = overlay
+                .outer_size()
+                .unwrap_or(tauri::PhysicalSize::new(120, 120));
+            let x = monitor.position().x + (size.width as i32 - win_size.width as i32) / 2;
+            // Position 10px from bottom (flush)
+            let y = monitor.position().y + size.height as i32 - win_size.height as i32 - 10;
+            let _ = overlay.set_position(tauri::PhysicalPosition::new(x, y));
+        } else {
+            println!("[ERROR] Could not detect any monitor for overlay positioning.");
+        }
+
+        // Force transparency hard
+        let _ = overlay.set_shadow(false);
+        let _ = overlay.set_ignore_cursor_events(true);
+
+        // Try to clear effects? Or just show.
         let _ = overlay.show();
+        let _ = overlay.set_focus();
+
+        #[cfg(target_os = "windows")]
+        {
+            // Windows-specific window settings if needed in future
+        }
     }
 
-    if let Some(window) = app.get_webview_window("main") {
+    if let Some(_window) = app.get_webview_window("main") {
         let _ = app.emit("status", "Recording");
     }
 
@@ -207,34 +345,59 @@ fn start_recording(app: &AppHandle) {
     let app_handle = app.clone();
 
     std::thread::spawn(move || {
-        let stream = AudioEngine::start_stream(tx, is_rec_clone.clone(), amp_clone.clone(), device_clone);
+        let stream =
+            AudioEngine::start_stream(tx, is_rec_clone.clone(), amp_clone.clone(), device_clone);
         if let Ok(s) = stream {
-             use cpal::traits::StreamTrait;
-             let _ = s.play();
-             while *is_rec_clone.lock() {
-                 let amp = *amp_clone.lock();
-                 let _ = app_handle.emit("amplitude", amp);
-                 std::thread::sleep(std::time::Duration::from_millis(30));
-             }
+            use cpal::traits::StreamTrait;
+            let _ = s.play();
+            let mut debug_counter = 0;
+            while *is_rec_clone.lock() {
+                let amp = *amp_clone.lock();
+
+                // Revert to GLOBAL Emission - Targeted failed to reach frontend
+                let _ = app_handle.emit("amplitude", amp);
+
+                // Debug log every 60 frames (~1 sec)
+                debug_counter += 1;
+                if debug_counter % 60 == 0 {
+                    if amp > 0.001 {
+                        println!("[DEBUG] Audio Amp: {:.4} (Signal OK)", amp);
+                    } else {
+                        println!("[DEBUG] Audio Amp: 0.0000 (SILENCE/DEAD)");
+                    }
+                }
+
+                std::thread::sleep(std::time::Duration::from_millis(15));
+            }
+        } else {
+            println!("[ERROR] Failed to start audio stream!");
         }
     });
 
     let engine = state.inference_engine.clone();
     let app_handle_2 = app.clone();
     let model_filename = state.selected_model.lock().clone();
-    
+
     tauri::async_runtime::spawn(async move {
-        println!("[DEBUG] Starting transcription loop with model: {}...", model_filename);
+        println!(
+            "[DEBUG] Starting transcription loop with model: {}...",
+            model_filename
+        );
         let transcript = engine.start_processing_loop(rx, model_filename).await;
-        println!("[DEBUG] Transcription complete: \"{}\"", transcript.as_str());
-        
+        println!(
+            "[DEBUG] Transcription complete: \"{}\"",
+            transcript.as_str()
+        );
+
         let _ = app_handle_2.emit("status", "Processing");
-        let refined = ContextEngine::refine_text(&transcript).await.unwrap_or_default();
+        let refined = ContextEngine::refine_text(&transcript)
+            .await
+            .unwrap_or_default();
         println!("[DEBUG] Refined text: \"{}\"", refined);
-        
+
         // Emit for the UI test area
         let _ = app_handle_2.emit("transcript", &refined);
-        
+
         let _ = OSIntegration::paste_text(&refined);
         let _ = app_handle_2.emit("status", "Ready");
     });
@@ -243,15 +406,17 @@ fn start_recording(app: &AppHandle) {
 fn stop_recording(app: &AppHandle) {
     let state = app.state::<AppState>();
     let mut recording_guard = state.is_recording.lock();
-    if !*recording_guard { return; }
+    if !*recording_guard {
+        return;
+    }
     *recording_guard = false;
     *state.tx_audio.lock() = None;
-    
+
     // Hide overlay
     if let Some(overlay) = app.get_webview_window("overlay") {
         let _ = overlay.hide();
     }
-    
+
     play_feedback_sound(440.0);
     println!(">>> VibeFlow: Recording Toggle OFF");
 }

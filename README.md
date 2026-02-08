@@ -60,12 +60,43 @@ npm run dev
 - Rust 1.77+
 - Tauri CLI
 
-### Build from Source
-```bash
-# Install Tauri CLI
-cargo install tauri-cli
+### Windows - Build from Source
 
-# Build for production
+```powershell
+# Clone the repo
+git clone https://github.com/DerJanniku/VibeFlow.git
+cd VibeFlow
+
+# Install all Windows dependencies (VS Build Tools, SDK, LLVM, CMake)
+.\scripts\setup-windows.ps1
+
+# Install npm dependencies
+npm install
+cd ui && npm install && cd ..
+
+# Run in development mode
+npm run dev
+
+# (Optional) Add to Windows Start Menu for easy access
+.\scripts\install-shortcut.ps1
+```
+
+### Linux - Build from Source
+```bash
+# Clone the repo
+git clone https://github.com/DerJanniku/VibeFlow.git
+cd VibeFlow
+
+# Install dependencies
+npm install
+cd ui && npm install && cd ..
+
+# Run in development mode
+npm run dev
+```
+
+### Build for Production
+```bash
 cargo tauri build
 ```
 

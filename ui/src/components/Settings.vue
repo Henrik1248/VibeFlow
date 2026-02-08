@@ -7,8 +7,8 @@ const emit = defineEmits(['close']);
 
 const audioDevices = ref([]);
 const selectedDevice = ref('');
-const modifiers = ref([]);
-const code = ref('F9');
+const modifiers = ref(['CTRL', 'SHIFT']);
+const code = ref('SPACE');
 const isRecordingHotkey = ref(false);
 const selectedTier = ref('fast');
 const downloadProgress = ref(0);
@@ -37,6 +37,17 @@ onMounted(async () => {
         const currentModel = await invoke('get_selected_model');
         for (const [t, filename] of Object.entries(tierToFilename)) {
             if (filename === currentModel) selectedTier.value = t;
+        }
+        
+        // Load saved hotkey
+        const hotkeyLabel = await invoke('get_hotkey');
+        if (hotkeyLabel) {
+            // Parse the hotkey string like "Ctrl + Shift + F9"
+            const parts = hotkeyLabel.split(' + ').map(p => p.trim());
+            const keyCode = parts.pop() || 'F9';
+            modifiers.value = parts.map(p => p.toUpperCase());
+            // Clean up code format like "KeyF9" to "F9"
+            code.value = keyCode.replace('Key', '').toUpperCase();
         }
     } catch (e) {
         console.error(e);
@@ -176,12 +187,12 @@ const save = async () => {
 
 .modal-header h2 {
     font-size: 20px;
-    font-weight: 600;
+    font-weight: 700;
 }
 
 .close-btn {
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
     background: var(--bg-tertiary);
     border: none;
     border-radius: 8px;
@@ -194,66 +205,74 @@ const save = async () => {
 }
 
 .close-btn:hover {
-    color: var(--red);
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text);
 }
 
 .modal-body {
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 20px;
 }
 
 .section {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
 }
 
 .section-label {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
 .tier-top {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 2px;
 }
 
 .tier-size {
-    font-size: 11px;
+    font-size: 10px;
     color: var(--text-secondary);
 }
 
+.tier-label {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text);
+}
+
 .tier-item.active .tier-label {
-    color: var(--accent);
+    color: var(--brand-primary);
 }
 
 .progress-box {
     background: var(--bg-tertiary);
-    padding: 16px;
+    padding: 14px;
     border-radius: 12px;
 }
 
 .progress-info {
     display: flex;
     justify-content: space-between;
-    font-size: 13px;
+    font-size: 12px;
     margin-bottom: 8px;
 }
 
 .progress-bar {
     height: 6px;
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
     border-radius: 3px;
     overflow: hidden;
 }
 
 .progress-fill {
     height: 100%;
-    background: var(--accent);
+    background: var(--brand-primary);
     transition: width 0.3s ease;
 }
 
@@ -261,7 +280,7 @@ const save = async () => {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px;
+    padding: 14px;
     background: var(--bg-tertiary);
     border: 1px solid var(--border);
     border-radius: 12px;
@@ -270,7 +289,8 @@ const save = async () => {
 }
 
 .hotkey-box.active {
-    border-color: var(--accent);
+    border-color: var(--brand-primary);
+    background: rgba(0, 132, 255, 0.05);
 }
 
 .hotkey-display {
@@ -280,21 +300,21 @@ const save = async () => {
 }
 
 .mod-key {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
-    background: rgba(255, 255, 255, 0.1);
-    padding: 4px 8px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 3px 6px;
     border-radius: 4px;
 }
 
 .main-key {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 700;
-    color: var(--accent);
+    color: var(--brand-primary);
 }
 
 .hotkey-action {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--text-secondary);
 }
 
@@ -302,3 +322,4 @@ const save = async () => {
     margin-top: 24px;
 }
 </style>
+

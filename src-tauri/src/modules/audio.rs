@@ -1,14 +1,14 @@
-use anyhow::{Result, anyhow};
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use std::sync::Arc;
-use tokio::sync::mpsc;
+use anyhow::{anyhow, Result};
+use cpal::traits::{DeviceTrait, HostTrait};
 use parking_lot::Mutex;
 use std::fmt;
+use std::sync::Arc;
+use tokio::sync::mpsc;
 
 // Audio constants
-const SAMPLE_RATE: u32 = 16000;
-const CHUNK_SIZE_MS: usize = 30;
-const FRAME_SIZE: usize = (SAMPLE_RATE as usize * CHUNK_SIZE_MS) / 1000;
+const _SAMPLE_RATE: u32 = 16000;
+const _CHUNK_SIZE_MS: usize = 30;
+const _FRAME_SIZE: usize = (_SAMPLE_RATE as usize * _CHUNK_SIZE_MS) / 1000;
 
 // Security: Protected Audio Buffer
 #[derive(zeroize::Zeroize, zeroize::ZeroizeOnDrop)]
@@ -44,11 +44,16 @@ impl AudioEngine {
             host.input_devices()?
                 .find(|x| x.name().map(|n| n == name).unwrap_or(false))
                 .or_else(|| {
-                    println!("[DEBUG] Device \"{}\" not found by name, trying fallback search...", name);
-                    host.input_devices().ok().and_then(|mut d| d.find(|x| {
-                        let n = x.name().unwrap_or_default().to_uppercase();
-                        n.contains("Q9") || n.contains("GENERIC") || n.contains("USB")
-                    }))
+                    println!(
+                        "[DEBUG] Device \"{}\" not found by name, trying fallback search...",
+                        name
+                    );
+                    host.input_devices().ok().and_then(|mut d| {
+                        d.find(|x| {
+                            let n = x.name().unwrap_or_default().to_uppercase();
+                            n.contains("Q9") || n.contains("GENERIC") || n.contains("USB")
+                        })
+                    })
                 })
                 .ok_or_else(|| anyhow!("Device not found"))?
         } else {
@@ -59,15 +64,15 @@ impl AudioEngine {
 
         let config = device.default_input_config()?;
         println!("[DEBUG] RAW Audio Device Config: {:?}", config);
-        
+
         let source_sample_rate = config.sample_rate().0 as f32;
         let source_channels = config.channels() as usize;
         let target_sample_rate = 16000.0;
-        
+
         let tx_clone = tx.clone();
         let amp_clone = amplitude.clone();
         let is_rec_clone = is_recording.clone();
-        
+
         // State for resampling
         let mut resample_buffer = Vec::new();
         let mut last_sample_pos = 0.0;
@@ -77,11 +82,17 @@ impl AudioEngine {
                 device.build_input_stream(
                     &config.into(),
                     move |data: &[f32], _: &_| {
-                        if !*is_rec_clone.lock() { return; }
-                        
+                        if !*is_rec_clone.lock() {
+                            return;
+                        }
+
                         // 1. Calculate amplitude for visualization (RMS)
                         let sum: f32 = data.iter().map(|&x| x * x).sum();
-                        let rms = if !data.is_empty() { (sum / data.len() as f32).sqrt() } else { 0.0 };
+                        let rms = if !data.is_empty() {
+                            (sum / data.len() as f32).sqrt()
+                        } else {
+                            0.0
+                        };
                         *amp_clone.lock() = rms;
 
                         // 2. Downmix to Mono
@@ -95,19 +106,19 @@ impl AudioEngine {
                         // This is a simple but effective live resampler
                         let mut processed_chunk = Vec::new();
                         let ratio = source_sample_rate / target_sample_rate;
-                        
+
                         for sample in mono_data {
                             resample_buffer.push(sample);
-                            
+
                             while last_sample_pos < resample_buffer.len() as f32 - 1.0 {
                                 let idx = last_sample_pos as usize;
                                 let frac = last_sample_pos - idx as f32;
-                                
+
                                 // Linear interpolation
                                 let s1 = resample_buffer[idx];
                                 let s2 = resample_buffer[idx + 1];
                                 let interpolated = s1 + (s2 - s1) * frac;
-                                
+
                                 processed_chunk.push(interpolated);
                                 last_sample_pos += ratio;
                             }
@@ -125,10 +136,14 @@ impl AudioEngine {
                         }
                     },
                     |err| println!("[ERROR] Audio stream error: {}", err),
-                    None
+                    None,
                 )?
-            },
-            _ => return Err(anyhow!("Unsupported sample format. Only F32 is supported by the current driver.")),
+            }
+            _ => {
+                return Err(anyhow!(
+                    "Unsupported sample format. Only F32 is supported by the current driver."
+                ))
+            }
         };
 
         Ok(stream)
@@ -143,18 +158,19 @@ impl AudioEngine {
                 return Ok(vec!["Default Microphone".to_string()]);
             }
         };
-        
+
         let mut names = Vec::new();
         println!("[DEBUG] CPAL Host: {}", host.id().name());
-        
+
         for device in devices {
             if let Ok(name) = device.name() {
                 println!("[DEBUG] RAW DEVICE NAME: \"{}\"", name);
-                
+
                 let mut display_name = name.clone();
                 if name.to_uppercase().contains("Q9") {
                     display_name = "Q9 Microphone 🎙️".to_string();
-                } else if name.starts_with("sysdefault:CARD=") || name.starts_with("default:CARD=") {
+                } else if name.starts_with("sysdefault:CARD=") || name.starts_with("default:CARD=")
+                {
                     display_name = name
                         .replace("sysdefault:CARD=", "")
                         .replace("default:CARD=", "")
@@ -171,11 +187,11 @@ impl AudioEngine {
                 println!("[DEBUG] Could not query name for a device");
             }
         }
-        
+
         if names.is_empty() {
             names.push("Default Microphone".to_string());
         }
-        
+
         println!("[DEBUG] Final selection for UI: {:?}", names);
         Ok(names)
     }

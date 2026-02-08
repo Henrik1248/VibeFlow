@@ -4,7 +4,7 @@
   "version": "0.3.0",
   "identifier": "com.derjannik.vibeflow",
   "build": {
-    "frontendDist": "ui/dist",
+    "frontendDist": "../ui/dist",
     "devUrl": "http://localhost:5173",
     "beforeDevCommand": "npm run dev --prefix ui",
     "beforeBuildCommand": "npm run build --prefix ui"
@@ -30,14 +30,15 @@
       {
         "title": "VibeFlow Overlay",
         "label": "overlay",
-        "width": 280,
-        "height": 80,
+        "width": 200,
+        "height": 120,
         "decorations": false,
         "transparent": true,
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "visible": false,
         "resizable": false,
+        "shadow": false,
         "x": 20,
         "y": 20
       }
