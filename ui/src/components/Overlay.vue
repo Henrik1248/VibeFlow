@@ -4,6 +4,9 @@ import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 
 const amplitude = ref(0);
+const ghostText = ref("");
+const context = ref({ app_name: "Desktop", mode: "Default" });
+
 // 3 stripes - Using reactive array for better performance in animation loop
 const dots = reactive([
     { height: 8, opacity: 0.8 },
@@ -12,6 +15,8 @@ const dots = reactive([
 ]);
 
 let unlistenAmp;
+let unlistenGhost;
+let unlistenContext;
 let animationFrame;
 let lastTime = 0;
 
@@ -24,6 +29,14 @@ onMounted(async () => {
         if (Math.random() < 0.05) console.log("Amp received:", val); // Log 5% of packets to avoid spam
         // UNCAPPED: Let it go wild. Sensitivity 60x.
         amplitude.value = val * 60.0;
+    });
+
+    unlistenGhost = await listen('transcript_partial', (event) => {
+        ghostText.value = event.payload;
+    });
+
+    unlistenContext = await listen('context_update', (event) => {
+        context.value = event.payload;
     });
 
     const animate = (time) => {
@@ -56,12 +69,35 @@ onMounted(async () => {
 
 onUnmounted(() => {
     if (unlistenAmp) unlistenAmp();
+    if (unlistenGhost) unlistenGhost();
+    if (unlistenContext) unlistenContext();
     if (animationFrame) cancelAnimationFrame(animationFrame);
 });
+
+function getModeIcon(mode) {
+    switch (mode) {
+        case 'Coding': return '💻';
+        case 'Chat': return '💬';
+        case 'Browser': return '🌐';
+        case 'Terminal': return '⌨️';
+        default: return '✨';
+    }
+}
 </script>
 
 <template>
   <div class="overlay-wrapper">
+      <!-- Context Badge -->
+      <div class="context-badge">
+          <span class="context-icon">{{ getModeIcon(context.mode) }}</span>
+          <span class="context-name">{{ context.app_name }}</span>
+      </div>
+
+      <!-- Ghost Text Container (Above or Below stripes) -->
+      <div v-if="ghostText" class="ghost-text">
+          {{ ghostText }}
+      </div>
+
       <div class="glass-capsule">
         <div class="stripes">
           <div v-for="(dot, i) in dots" :key="i" 
@@ -88,10 +124,62 @@ html, body, #app {
   width: 100%;
   height: 100%;
   display: flex;
+  flex-direction: column; /* Stack text and pill */
   align-items: center; 
   justify-content: center;
   background: transparent !important;
   pointer-events: none;
+  gap: 12px;
+}
+
+.context-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(8px);
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 4px;
+    animation: slideDown 0.3s ease-out;
+}
+
+.context-icon {
+    font-size: 14px;
+}
+
+.context-name {
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 500;
+}
+
+.ghost-text {
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.9);
+    text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    background: rgba(0, 0, 0, 0.4);
+    padding: 6px 12px;
+    border-radius: 12px;
+    backdrop-filter: blur(4px);
+    max-width: 300px;
+    text-align: center;
+    font-style: italic;
+    animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .glass-capsule {

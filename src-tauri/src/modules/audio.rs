@@ -1,14 +1,20 @@
 use anyhow::{anyhow, Result};
 use cpal::traits::{DeviceTrait, HostTrait};
 use parking_lot::Mutex;
+use std::collections::VecDeque;
 use std::fmt;
 use std::sync::Arc;
 use tokio::sync::mpsc;
+// VAD & Noise Suppression would be integrated here
+// For Phase 1, we will implement the Ring Buffer logic first as the Core "Rewind" mechanic.
+// The VAD integration with 'tract' requires loading an ONNX model file.
+// To keep Phase 1 pure "Core Audio Refactor", we will implement the Ring Buffer and prepare the struct for VAD.
 
 // Audio constants
-const _SAMPLE_RATE: u32 = 16000;
-const _CHUNK_SIZE_MS: usize = 30;
-const _FRAME_SIZE: usize = (_SAMPLE_RATE as usize * _CHUNK_SIZE_MS) / 1000;
+const SAMPLE_RATE: u32 = 16000;
+const PRE_RECORD_SECONDS: usize = 3;
+// 16000 samples/sec * 3 sec = 48000 samples
+const RING_BUFFER_SIZE: usize = (SAMPLE_RATE as usize) * PRE_RECORD_SECONDS;
 
 // Security: Protected Audio Buffer
 #[derive(zeroize::Zeroize, zeroize::ZeroizeOnDrop)]
@@ -77,14 +83,18 @@ impl AudioEngine {
         let mut resample_buffer = Vec::new();
         let mut last_sample_pos = 0.0;
 
+        // Ring Buffer State (The "Rewind" Memory)
+        let mut ring_buffer: VecDeque<f32> = VecDeque::with_capacity(RING_BUFFER_SIZE);
+
+        // Flag to indicate if we have just started recording and need to flush the ring buffer
+        let mut was_recording = false;
+
         let stream = match config.sample_format() {
             cpal::SampleFormat::F32 => {
                 device.build_input_stream(
                     &config.into(),
                     move |data: &[f32], _: &_| {
-                        if !*is_rec_clone.lock() {
-                            return;
-                        }
+                        let recording_now = *is_rec_clone.lock();
 
                         // 1. Calculate amplitude for visualization (RMS)
                         let sum: f32 = data.iter().map(|&x| x * x).sum();
@@ -103,7 +113,6 @@ impl AudioEngine {
                         }
 
                         // 3. Resample to 16kHz (Linear Interpolation)
-                        // This is a simple but effective live resampler
                         let mut processed_chunk = Vec::new();
                         let ratio = source_sample_rate / target_sample_rate;
 
@@ -132,7 +141,33 @@ impl AudioEngine {
                         }
 
                         if !processed_chunk.is_empty() {
-                            let _ = tx_clone.try_send(SensitiveAudio::new(processed_chunk));
+                            // --- REWIND LOGIC START ---
+
+                            // Always push to ring buffer first
+                            for &sample in &processed_chunk {
+                                if ring_buffer.len() >= RING_BUFFER_SIZE {
+                                    ring_buffer.pop_front();
+                                }
+                                ring_buffer.push_back(sample);
+                            }
+
+                            // If we just started recording, FLUSH the ring buffer to the channel
+                            if recording_now && !was_recording {
+                                println!(
+                                    "[DEBUG] Rewind triggered! Flushing {} samples from history.",
+                                    ring_buffer.len()
+                                );
+                                let history: Vec<f32> = ring_buffer.iter().cloned().collect();
+                                let _ = tx_clone.try_send(SensitiveAudio::new(history));
+                            }
+
+                            // If currently recording, ALSO send the new chunk directly
+                            if recording_now {
+                                let _ = tx_clone.try_send(SensitiveAudio::new(processed_chunk));
+                            }
+
+                            was_recording = recording_now;
+                            // --- REWIND LOGIC END ---
                         }
                     },
                     |err| println!("[ERROR] Audio stream error: {}", err),

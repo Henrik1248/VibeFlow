@@ -133,6 +133,98 @@ async fn main() {
             let mods_val = *hotkey_modifiers.lock();
             let code_val = *hotkey_code.lock();
 
+            // --- CORE AUDIO REFACTOR: ALWAYS-ON STREAM ---
+            let (tx, rx) = mpsc::channel(100);
+            *tx_audio.lock() = Some(tx.clone());
+
+            let is_rec_clone = is_recording.clone();
+            let amp_clone = amplitude.clone();
+            let device_clone = selected_device.lock().clone();
+            let app_handle = app.handle().clone();
+
+            std::thread::spawn(move || {
+                let stream = AudioEngine::start_stream(
+                    tx,
+                    is_rec_clone.clone(),
+                    amp_clone.clone(),
+                    device_clone,
+                );
+                if let Ok(s) = stream {
+                    use cpal::traits::StreamTrait;
+                    let _ = s.play();
+
+                    println!(
+                        "[DEBUG] Audio Stream Started (Always-On Mode) - Listening to buffer..."
+                    );
+
+                    let mut debug_counter = 0;
+                    loop {
+                        let amp = *amp_clone.lock();
+                        // Global emit of amplitude for visualizer (even when not recording, for "alive" feel)
+                        // Or maybe only when recording? Let's keep it always for now for "Dynamic Island" feel.
+                        let _ = app_handle.emit("amplitude", amp);
+
+                        // Debug log every 240 frames (~4 sec) to reduce spam
+                        debug_counter += 1;
+                        if debug_counter % 240 == 0 {
+                            if amp > 0.001 {
+                                println!("[DEBUG] Audio Signal Detect: {:.4}", amp);
+                            }
+                        }
+
+                        std::thread::sleep(std::time::Duration::from_millis(15));
+                    }
+                } else {
+                    println!("[ERROR] Failed to start audio stream!");
+                }
+            });
+
+            // --- INFERENCE REFACTOR: LISTENER ---
+            let engine = inference_engine.clone();
+            let app_handle_2 = app.handle().clone();
+            let model_filename = selected_model.lock().clone();
+
+            tauri::async_runtime::spawn(async move {
+                println!(
+                    "[DEBUG] Starting transcription loop with model: {}...",
+                    model_filename
+                );
+
+                loop {
+                    let (refined, command) = match engine
+                        .start_processing_loop(&mut rx, &model_filename, &app_handle_2)
+                        .await
+                    {
+                        transcript if !transcript.as_str().trim().is_empty() => {
+                            let _ = app_handle_2.emit("status", "Processing");
+                            match ContextEngine::refine_text(&transcript).await {
+                                Ok(res) => res,
+                                Err(_) => (transcript.as_str().to_string(), None),
+                            }
+                        }
+                        _ => continue,
+                    };
+
+                    println!("[DEBUG] Final Refined: \"{}\"", refined);
+                    let _ = app_handle_2.emit("transcript", &refined);
+
+                    if let Some(cmd) = command {
+                        let _ = OSIntegration::execute_command(cmd);
+                    } else {
+                        let _ = OSIntegration::paste_text(&refined);
+                    }
+                    let _ = app_handle_2.emit("status", "Ready");
+                }
+            });
+
+            // --- CONTEXT WATCHER ---
+            let app_handle_3 = app.handle().clone();
+            std::thread::spawn(move || loop {
+                let context = ContextEngine::get_context();
+                let _ = app_handle_3.emit("context_update", &context);
+                std::thread::sleep(std::time::Duration::from_secs(1));
+            });
+
             let state = AppState {
                 is_recording,
                 tx_audio,
@@ -261,6 +353,12 @@ fn start_recording(app: &AppHandle) {
     play_feedback_sound(880.0);
     println!(">>> VibeFlow: Recording Toggle ON");
 
+    // NEW LOGIC: We don't spawn a thread here anymore.
+    // The thread is already running in main().
+    // We just toggled the flag, which tells the loop in audio.rs to start pushing data to the channel.
+    // AND it triggers the "Flush Ring Buffer" logic due to the flag flip.
+
+    // Position overlay logic remains the same
     // Get active window to determine which monitor the user is looking at
     let target_monitor = if let Ok(active_window) = active_win_pos_rs::get_active_window() {
         let active_center_x =
@@ -335,72 +433,6 @@ fn start_recording(app: &AppHandle) {
     if let Some(_window) = app.get_webview_window("main") {
         let _ = app.emit("status", "Recording");
     }
-
-    let (tx, rx) = mpsc::channel(100);
-    *state.tx_audio.lock() = Some(tx.clone());
-
-    let is_rec_clone = state.is_recording.clone();
-    let amp_clone = state.amplitude.clone();
-    let device_clone = state.selected_device.lock().clone();
-    let app_handle = app.clone();
-
-    std::thread::spawn(move || {
-        let stream =
-            AudioEngine::start_stream(tx, is_rec_clone.clone(), amp_clone.clone(), device_clone);
-        if let Ok(s) = stream {
-            use cpal::traits::StreamTrait;
-            let _ = s.play();
-            let mut debug_counter = 0;
-            while *is_rec_clone.lock() {
-                let amp = *amp_clone.lock();
-
-                // Revert to GLOBAL Emission - Targeted failed to reach frontend
-                let _ = app_handle.emit("amplitude", amp);
-
-                // Debug log every 60 frames (~1 sec)
-                debug_counter += 1;
-                if debug_counter % 60 == 0 {
-                    if amp > 0.001 {
-                        println!("[DEBUG] Audio Amp: {:.4} (Signal OK)", amp);
-                    } else {
-                        println!("[DEBUG] Audio Amp: 0.0000 (SILENCE/DEAD)");
-                    }
-                }
-
-                std::thread::sleep(std::time::Duration::from_millis(15));
-            }
-        } else {
-            println!("[ERROR] Failed to start audio stream!");
-        }
-    });
-
-    let engine = state.inference_engine.clone();
-    let app_handle_2 = app.clone();
-    let model_filename = state.selected_model.lock().clone();
-
-    tauri::async_runtime::spawn(async move {
-        println!(
-            "[DEBUG] Starting transcription loop with model: {}...",
-            model_filename
-        );
-        let transcript = engine.start_processing_loop(rx, model_filename).await;
-        println!(
-            "[DEBUG] Transcription complete: \"{}\"",
-            transcript.as_str()
-        );
-
-        let _ = app_handle_2.emit("status", "Processing");
-        let refined = ContextEngine::refine_text(&transcript)
-            .await
-            .unwrap_or_default();
-        println!("[DEBUG] Refined text: \"{}\"", refined);
-
-        // Emit for the UI test area
-        let _ = app_handle_2.emit("transcript", &refined);
-
-        let _ = OSIntegration::paste_text(&refined);
-        let _ = app_handle_2.emit("status", "Ready");
-    });
 }
 
 fn stop_recording(app: &AppHandle) {
@@ -410,7 +442,7 @@ fn stop_recording(app: &AppHandle) {
         return;
     }
     *recording_guard = false;
-    *state.tx_audio.lock() = None;
+    // *state.tx_audio.lock() = None; // DON'T CLOSE CHANNEL! It stays open.
 
     // Hide overlay
     if let Some(overlay) = app.get_webview_window("overlay") {

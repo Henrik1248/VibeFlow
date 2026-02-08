@@ -36,6 +36,9 @@ once_cell = "1.18"
 lazy_static = "1.4"
 base64 = "0.21"
 whisper-rs = "0.13"
+nnnoiseless = "0.5.2"
+tract-onnx = "0.21.13"
+tract-core = "0.21.13"
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]

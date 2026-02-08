@@ -23,54 +23,63 @@ impl OSIntegration {
     }
 
     pub fn paste_text(text: &str) -> Result<()> {
-        println!("[DEBUG] paste_text called with {} chars", text.len());
+        // ... (existing paste_text) ...
+        println!("[DEBUG] paste_text: {}", text);
 
-        // Runtime Mock Check for Integration Tests
-        if env::var("VIBEFLOW_TEST_MODE").is_ok() {
-            *MOCK_CLIPBOARD.lock().unwrap() = text.to_string();
-            return Ok(());
-        }
-
-        let mut clipboard = Clipboard::new().map_err(|e| {
-            println!("[ERROR] Failed to create clipboard: {:?}", e);
-            e
-        })?;
-
-        // Security: Save previous state
+        let mut clipboard = Clipboard::new()?;
         let original_content = clipboard.get_text().unwrap_or_default();
-        println!(
-            "[DEBUG] Saved original clipboard content ({} chars)",
-            original_content.len()
-        );
+        clipboard.set_text(text.to_owned())?;
 
-        // Set new content
-        clipboard.set_text(text.to_owned()).map_err(|e| {
-            println!("[ERROR] Failed to set clipboard text: {:?}", e);
-            e
-        })?;
-        println!("[DEBUG] Set clipboard text successfully");
-
-        // Small delay to ensure clipboard is ready
         thread::sleep(Duration::from_millis(100));
-
         let mut enigo = Enigo::new();
-        println!("[DEBUG] Simulating Ctrl+V...");
         enigo.key_down(EnigoKey::Control);
         enigo.key_click(EnigoKey::Layout('v'));
         enigo.key_up(EnigoKey::Control);
-        println!("[DEBUG] Ctrl+V simulation complete");
 
-        // Security: Restore logic after 500ms
         thread::sleep(Duration::from_millis(500));
-
-        // Restore
         let _ = clipboard.set_text(original_content);
-        println!("[DEBUG] Restored original clipboard content");
-
         Ok(())
     }
 
-    pub fn _get_mock_paste() -> String {
-        MOCK_CLIPBOARD.lock().unwrap().clone()
+    pub fn execute_command(command: crate::modules::llm::Command) -> Result<()> {
+        let mut enigo = Enigo::new();
+        match command {
+            crate::modules::llm::Command::Delete => {
+                // Ctrl+BackSpace or multiple Backspaces to "Delete that"
+                // Let's do Ctrl+Shift+Left -> Backspace for "Delete word"
+                enigo.key_down(EnigoKey::Control);
+                enigo.key_down(EnigoKey::Shift);
+                enigo.key_click(EnigoKey::LeftArrow);
+                enigo.key_up(EnigoKey::Shift);
+                enigo.key_up(EnigoKey::Control);
+                enigo.key_click(EnigoKey::Backspace);
+            }
+            crate::modules::llm::Command::Bold => {
+                // Select word and Ctrl+B
+                enigo.key_down(EnigoKey::Control);
+                enigo.key_down(EnigoKey::Shift);
+                enigo.key_click(EnigoKey::LeftArrow);
+                enigo.key_up(EnigoKey::Shift);
+                enigo.key_click(EnigoKey::Layout('b'));
+                enigo.key_up(EnigoKey::Control);
+            }
+            crate::modules::llm::Command::Italic => {
+                enigo.key_down(EnigoKey::Control);
+                enigo.key_down(EnigoKey::Shift);
+                enigo.key_click(EnigoKey::LeftArrow);
+                enigo.key_up(EnigoKey::Shift);
+                enigo.key_click(EnigoKey::Layout('i'));
+                enigo.key_up(EnigoKey::Control);
+            }
+            crate::modules::llm::Command::SelectAll => {
+                enigo.key_down(EnigoKey::Control);
+                enigo.key_click(EnigoKey::Layout('a'));
+                enigo.key_up(EnigoKey::Control);
+            }
+            crate::modules::llm::Command::Enter => {
+                enigo.key_click(EnigoKey::Return);
+            }
+        }
+        Ok(())
     }
 }
