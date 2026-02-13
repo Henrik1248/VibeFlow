@@ -39,7 +39,7 @@ VibeFlow is built with a commitment to privacy and performance:
 - **Smart Context** - Automatically detects if you are in a Code Editor, Terminal, or Chat app and adjusts the text style accordingly.
 - **Dynamic Overlay** - A sleek, cyberpunk-inspired visualizer shows your audio amplitude in real-time.
 - **System Tray** - Runs quietly in the background, always ready.
-- **Auto-Paste** - Transcribed text is automatically pasted at your cursor.
+- **Auto-Paste** - Transcribed text is automatically pasted into the text field you are currently in.
 
 ---
 
