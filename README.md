@@ -8,12 +8,26 @@
 **Voice-to-Text Transcription Powered by Whisper AI**
 A professional, privacy-focused transcription tool that runs entirely on your local machine.
 
+[Changelog](CHANGELOG.md) | [License](LICENSE) | [Security](SECURITY.md)
+
 ---
 
 ### ⚠️ Development Status
 **VibeFlow is currently in active development.**
 - **Current Stable Version:** `v0.3.3` (This is currently the only version that runs reliably).
 - **Supported Platforms:** Currently **Windows only** (optimized to work perfectly on Windows). Linux/macOS support is planned for future releases.
+
+---
+
+## 🛠️ The Local AI Stack
+
+VibeFlow is built with a commitment to privacy and performance:
+
+- **Frontend:** Vue.js 3 + Vite (Apple-inspired Cyberpunk UI)
+- **Core:** Rust (Tauri 2.0)
+- **Inference:** `whisper-rs` (Local Whisper AI)
+- **Refinement:** Local Ollama integration
+- **Audio:** `cpal` for high-performance low-latency audio capture
 
 ---
 
