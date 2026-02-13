@@ -1,127 +1,103 @@
 # 🌊 VibeFlow
 
-**Voice-to-Text Transcription Powered by Whisper AI**
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Status: Development](https://img.shields.io/badge/Status-In--Development-orange.svg)](#)
+[![OS: Windows](https://img.shields.io/badge/OS-Windows-blue.svg)](#)
+[![Version: 0.3.3](https://img.shields.io/badge/Version-0.3.3-green.svg)](#)
 
-*Made by DerJannik*
+**Voice-to-Text Transcription Powered by Whisper AI**
+A professional, privacy-focused transcription tool that runs entirely on your local machine.
+
+---
+
+### ⚠️ Development Status
+**VibeFlow is currently in active development.**
+- **Current Stable Version:** `v0.3.3` (This is currently the only version that runs reliably).
+- **Supported Platforms:** Currently **Windows only** (optimized to work perfectly on Windows). Linux/macOS support is planned for future releases.
 
 ---
 
 ## ✨ Features
 
-- **Real-time Transcription** - Press a hotkey and speak. Your words appear instantly.
-- **Whisper AI** - Powered by OpenAI's Whisper for accurate transcription.
+- **Real-time Transcription** - Press a hotkey (Default: `Ctrl + Shift + Space`) and speak. Your words appear instantly.
+- **Privacy First** - Powered by **Whisper AI** running locally. Your voice data never leaves your computer.
+- **AI Refinement** - Optionally uses **Ollama** (locally) to correct grammar and formatting based on the application you are using (Coding, Chat, Browser, etc.).
+- **Smart Context** - Automatically detects if you are in a Code Editor, Terminal, or Chat app and adjusts the text style accordingly.
+- **Dynamic Overlay** - A sleek, cyberpunk-inspired visualizer shows your audio amplitude in real-time.
 - **System Tray** - Runs quietly in the background, always ready.
-- **Mini Overlay** - A compact visualizer shows when you're recording.
-- **Auto-Paste** - Transcribed text is automatically pasted where your cursor is.
-- **Cross-Platform** - Works on Windows and Linux.
-
-## 🚀 Quick Start
-
-### Windows
-1. Download the latest `.exe` from [Releases](https://github.com/DerJanniku/VibeFlow/releases)
-2. Run the installer
-3. Press `F9` to start transcribing!
-
-### Linux
-```bash
-# Clone the repo
-git clone https://github.com/DerJanniku/VibeFlow.git
-cd VibeFlow
-
-# Install dependencies
-npm install
-cd ui && npm install && cd ..
-
-# Run in development mode
-npm run dev
-```
-
-## ⌨️ Default Hotkey
-
-| Action | Hotkey |
-|--------|--------|
-| Start/Stop Recording | `F9` |
-
-*Customize in Settings*
-
-## 🎛️ AI Models
-
-| Model | Size | Speed | Accuracy |
-|-------|------|-------|----------|
-| Realfast | 75MB | ⚡⚡⚡ | Good |
-| Fast | 140MB | ⚡⚡ | Better |
-| Standard | 460MB | ⚡ | Great |
-| Pro | 1.6GB | 🐢 | Best |
-
-## 🛠️ Development
-
-### Prerequisites
-- Node.js 20+
-- Rust 1.77+
-- Tauri CLI
-
-### Windows - Build from Source
-
-```powershell
-# Clone the repo
-git clone https://github.com/DerJanniku/VibeFlow.git
-cd VibeFlow
-
-# Install all Windows dependencies (VS Build Tools, SDK, LLVM, CMake)
-.\scripts\setup-windows.ps1
-
-# Install npm dependencies
-npm install
-cd ui && npm install && cd ..
-
-# Run in development mode
-npm run dev
-
-# (Optional) Add to Windows Start Menu for easy access
-.\scripts\install-shortcut.ps1
-```
-
-### Linux - Build from Source
-```bash
-# Clone the repo
-git clone https://github.com/DerJanniku/VibeFlow.git
-cd VibeFlow
-
-# Install dependencies
-npm install
-cd ui && npm install && cd ..
-
-# Run in development mode
-npm run dev
-```
-
-### Build for Production
-```bash
-cargo tauri build
-```
-
-## 📁 Project Structure
-
-```
-VibeFlow/
-├── ui/                  # Vue.js frontend
-│   ├── src/
-│   │   ├── components/  # Vue components
-│   │   └── style.css    # Global styles
-├── src-tauri/           # Rust backend
-│   ├── src/
-│   │   ├── main.rs      # Entry point
-│   │   └── modules/     # Audio, inference, etc.
-└── .github/workflows/   # CI/CD
-```
-
-## 📄 License
-
-Proprietary - All rights reserved by DerJannik
+- **Auto-Paste** - Transcribed text is automatically pasted at your cursor.
 
 ---
 
-<p align="center">
-  <b>Made with ❤️ by DerJannik</b><br>
-  <a href="https://de.fiverr.com/s/xXgY29x">Hire me on Fiverr</a>
-</p>
+## 🚀 Quick Start (v0.3.3)
+
+### Windows
+1. Download the latest release from the [Releases](https://github.com/DerJanniku/VibeFlow/releases) page.
+2. Run `vibeflow.exe`.
+3. Complete the onboarding to download the AI models (stored in `%APPDATA%/com.vibeflow.app`).
+4. Press `Ctrl + Shift + Space` (default) to start/stop transcribing!
+
+---
+
+## ⌨️ Hotkeys
+
+| Action | Hotkey |
+| :--- | :--- |
+| **Start/Stop Recording** | `Ctrl + Shift + Space` |
+| **Customization** | Change in Settings UI |
+
+---
+
+## 🛠️ Build from Source (Windows)
+
+### Prerequisites
+- [Node.js 20+](https://nodejs.org/)
+- [Rust 1.77+](https://rustup.rs/)
+- [Tauri CLI 2.0](https://tauri.app/)
+
+### Steps
+1. **Clone the repo**
+   ```bash
+   git clone https://github.com/DerJanniku/VibeFlow.git
+   cd VibeFlow
+   ```
+
+2. **Install UI dependencies**
+   ```bash
+   cd ui
+   npm install
+   cd ..
+   ```
+
+3. **Install Core dependencies**
+   ```bash
+   npm install
+   ```
+
+4. **Run in Development Mode**
+   ```bash
+   npm run dev
+   ```
+
+5. **Build for Production**
+   ```bash
+   npm run build
+   ```
+
+---
+
+## 📁 Project Structure
+
+- `src-tauri/` - Rust backend (Core logic, Audio, Inference).
+- `ui/` - Vue.js 3 frontend (Settings, Overlay, Onboarding).
+- `scripts/` - Automation scripts for setup and shortcuts.
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+
+---
+
+*Made with ❤️ by [DerJannik](https://de.fiverr.com/s/xXgY29x)*

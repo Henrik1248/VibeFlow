@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/config-schema.json",
   "productName": "vibeflow",
-  "version": "0.3.0",
+  "version": "0.3.3",
   "identifier": "com.derjannik.vibeflow",
   "build": {
     "frontendDist": "../ui/dist",
