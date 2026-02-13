@@ -1,6 +1,22 @@
 {
   "name": "vibeflow",
-  "version": "0.0.0",
+  "productName": "VibeFlow",
+  "version": "0.3.3",
+  "description": "Professional Voice-to-Text Transcription Tool with local Whisper AI",
+  "author": "DerJannik",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DerJanniku/VibeFlow.git"
+  },
+  "keywords": [
+    "tauri",
+    "whisper",
+    "ai",
+    "transcription",
+    "voice-to-text",
+    "rust"
+  ],
   "scripts": {
     "tauri": "tauri",
     "dev": "tauri dev",
