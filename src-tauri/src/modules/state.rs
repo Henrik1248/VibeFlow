@@ -4,6 +4,7 @@ use tokio::sync::mpsc;
 use crate::modules::{inference::InferenceEngine, audio::SensitiveAudio};
 use tauri_plugin_global_shortcut::{Modifiers, Code};
 
+#[allow(dead_code)]
 pub struct AppState {
     pub is_recording: Arc<Mutex<bool>>,
     pub tx_audio: Arc<Mutex<Option<mpsc::Sender<SensitiveAudio>>>>,
