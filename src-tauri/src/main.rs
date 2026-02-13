@@ -18,7 +18,7 @@ use rodio::{OutputStream, Sink, Source};
 use std::sync::Arc;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::window::Color;
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_global_shortcut::{
@@ -173,7 +173,6 @@ async fn main() {
                         "[DEBUG] Audio Stream Started (Always-On Mode) - Listening to buffer..."
                     );
 
-                    let mut debug_counter = 0;
                     loop {
                         let amp = *amp_clone.lock();
                         // Global emit of amplitude for visualizer (even when not recording, for "alive" feel)

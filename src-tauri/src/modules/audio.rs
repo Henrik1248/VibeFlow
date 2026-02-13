@@ -44,39 +44,7 @@ impl AudioEngine {
         amplitude: Arc<Mutex<f32>>,
         device_name: Option<String>,
     ) -> Result<cpal::Stream> {
-        let host = if cfg!(target_os = "linux") {
-            println!("[DEBUG] Linux detected - checking audio backends...");
-            
-            // 1. Try Jack (Preferred for Pro Audio)
-            let jack_host = cpal::host_from_id(cpal::HostId::Jack).ok();
-            let mut use_jack = false;
-            
-            if let Some(ref h) = jack_host {
-                 // Verify if Jack server is actually running by probing devices
-                 match h.input_devices() {
-                     Ok(mut devices) => {
-                         if devices.next().is_some() {
-                             println!("[DEBUG] Audio Host: Jack is ACTIVE and has devices.");
-                             use_jack = true;
-                         } else {
-                             println!("[DEBUG] Audio Host: Jack found but has NO devices (Server likely down).");
-                         }
-                     },
-                     Err(e) => {
-                         println!("[DEBUG] Audio Host: Jack probe failed: {}", e);
-                     }
-                 }
-            }
-
-            if use_jack {
-                jack_host.unwrap()
-            } else {
-                println!("[DEBUG] Audio Host: Falling back to System Default (ALSA/Pulse)");
-                cpal::default_host()
-            }
-        } else {
-            cpal::default_host()
-        };
+        let host = cpal::default_host();
 
         // 3. Define the Stream Builder (Closure)
         let build_stream_fn = |device: &cpal::Device| -> Result<cpal::Stream> {
