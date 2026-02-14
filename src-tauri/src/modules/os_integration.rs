@@ -1,3 +1,6 @@
+#[cfg(target_os="linux")]
+use crate::modules::linux_paste::LinuxPaste;
+
 use active_win_pos_rs::get_active_window;
 use anyhow::Result;
 use arboard::Clipboard;
@@ -40,48 +43,55 @@ impl OSIntegration {
 
         println!("[DEBUG] paste_text: {}", text);
 
-        #[cfg(target_os = "linux")]
-        {
-            // LINUX STRATEGY: xdotool (Safe for Wayland if XWayland is active, or X11)
-            // 1. Set Clipboard
-            match Clipboard::new() {
-                 Ok(mut clip) => { 
-                     if let Err(e) = clip.set_text(text.to_owned()) {
-                         println!("[LINUX] Clipboard set failed: {}", e);
-                     }
-                 }
-                 Err(e) => println!("[LINUX] Clipboard init failed: {}", e),
-            }
+        // #[cfg(target_os = "linux")]
+        // {
+        //     // LINUX STRATEGY: xdotool (Safe for Wayland if XWayland is active, or X11)
+        //     // 1. Set Clipboard
+        //     match Clipboard::new() {
+        //          Ok(mut clip) => { 
+        //              if let Err(e) = clip.set_text(text.to_owned()) {
+        //                  println!("[LINUX] Clipboard set failed: {}", e);
+        //              }
+        //          }
+        //          Err(e) => println!("[LINUX] Clipboard init failed: {}", e),
+        //     }
             
-            // 2. Small Sleep to ensure clipboard manager has it
-            thread::sleep(Duration::from_millis(50));
+        //     // 2. Small Sleep to ensure clipboard manager has it
+        //     thread::sleep(Duration::from_millis(50));
             
-            // 3. Simulate Ctrl+V using xdotool
-            println!("[LINUX] Attempting xdotool paste...");
+        //     // 3. Simulate Ctrl+V using xdotool
+        //     println!("[LINUX] Attempting xdotool paste...");
             
-            let output = std::process::Command::new("xdotool")
-                .arg("key")
-                .arg("ctrl+v")
-                .output();
+        //     let output = std::process::Command::new("xdotool")
+        //         .arg("key")
+        //         .arg("ctrl+v")
+        //         .output();
 
-            match output {
-                Ok(out) => {
-                    if !out.status.success() {
-                        println!("[LINUX] xdotool returned error exit code: {:?}", out.status.code());
-                        println!("[LINUX] stderr: {}", String::from_utf8_lossy(&out.stderr));
-                    } else {
-                        println!("[LINUX] xdotool paste command triggered successfully.");
-                    }
-                }
-                Err(e) => {
-                    println!("[LINUX] xdotool execution failed completely: {}", e);
-                    println!("[LINUX] SUGGESTION: Please ensure 'xdotool' is installed (e.g., sudo apt install xdotool)");
-                }
-            }
+        //     match output {
+        //         Ok(out) => {
+        //             if !out.status.success() {
+        //                 println!("[LINUX] xdotool returned error exit code: {:?}", out.status.code());
+        //                 println!("[LINUX] stderr: {}", String::from_utf8_lossy(&out.stderr));
+        //             } else {
+        //                 println!("[LINUX] xdotool paste command triggered successfully.");
+        //             }
+        //         }
+        //         Err(e) => {
+        //             println!("[LINUX] xdotool execution failed completely: {}", e);
+        //             println!("[LINUX] SUGGESTION: Please ensure 'xdotool' is installed (e.g., sudo apt install xdotool)");
+        //         }
+        //     }
                 
-            return Ok(());
+        //     return Ok(());
+        // }
+        #[cfg(target_os="linux")]
+        {
+            println!("[DEBUG] paste_text:{}",text);
+            return LinuxPaste::paste_text(text).map_err(|e| {
+                println!("[LINUX] Paste failed:{}",e);
+                e
+            });
         }
-
         #[cfg(target_os = "windows")]
         {
             // WINDOWS STRATEGY: Enigo (Reliable on Windows)
@@ -126,13 +136,14 @@ impl OSIntegration {
                 Command::Enter => "Return",
             };
             
-            println!("[LINUX] Executing command via xdotool: {}", key_sequence);
-            let _ = std::process::Command::new("xdotool")
-                .arg("key")
-                .arg(key_sequence)
-                .spawn();
+            // println!("[LINUX] Executing command via xdotool: {}", key_sequence);
+            // let _ = std::process::Command::new("xdotool")
+            //     .arg("key")
+            //     .arg(key_sequence)
+            //     .spawn();
                 
-            return Ok(());
+            // return Ok(());
+            return LinuxPaste::execute_command(key_sequence);
         }
 
         #[cfg(target_os = "windows")]
@@ -181,3 +192,5 @@ impl OSIntegration {
         }
     }
 }
+
+

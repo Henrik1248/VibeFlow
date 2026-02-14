@@ -5,6 +5,7 @@ mod modules {
     pub mod commands;
     pub mod inference;
     pub mod llm;
+    pub mod linux_paste;
     pub mod os_integration;
     pub mod state;
 }
