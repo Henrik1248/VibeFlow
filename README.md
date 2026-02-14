@@ -15,7 +15,10 @@ A professional, privacy-focused transcription tool that runs entirely on your lo
 ### ⚠️ Development Status
 **VibeFlow is currently in active development.**
 - **Current Stable Version:** `v0.3.3` (This is currently the only version that runs reliably).
-- **Supported Platforms:** Currently **Windows only** (optimized to work perfectly on Windows). Linux/macOS support is planned for future releases.
+- **Supported Platforms:**
+    - **Windows:** 10/11 (Primary, optimized experience).
+    - **Linux:** Experimental Beta (Supports X11 & Wayland).
+    - **macOS:** Planned.
 
 ---
 

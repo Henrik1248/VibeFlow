@@ -3,10 +3,10 @@
 VibeFlow is actively evolving. Our mission is to build the best privacy-focused, local-first voice interface for desktop operating systems.
 
 ## 🚀 Priority 1: Cross-Platform Support
-- [ ] **Linux Support:**
-    - Fix `active-win-pos-rs` integration for Wayland/X11.
-    - Implement reliable text insertion via `xdotool` or `uinput`.
-    - Fix System Tray dependency issues.
+- [x] **Linux Support (Beta):**
+    - [x] Implement reliable text insertion via `xdotool` (X11) and `wtype/ydotool` (Wayland).
+    - [ ] Fix `active-win-pos-rs` integration for Wayland/X11.
+    - [ ] Fix System Tray dependency issues.
 - [ ] **macOS Support:**
     - Implement Accessiblity API hooks for text insertion.
     - Test Audio permission handling on macOS.
